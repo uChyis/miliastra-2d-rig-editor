@@ -23,8 +23,10 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "check:export": "node scripts/export-check.mjs",
+    "check:data": "node scripts/data-check.mjs",
+    "check:opfs": "node scripts/opfs-check.mjs",
     "parity": "node scripts/parity.mjs",
-    "check": "node scripts/export-check.mjs && node scripts/parity.mjs"
+    "check": "node scripts/data-check.mjs && node scripts/opfs-check.mjs && node scripts/export-check.mjs && node scripts/parity.mjs"
   },
   "dependencies": {
     "@radix-ui/colors": "^3.0.0",

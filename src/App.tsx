@@ -19,6 +19,7 @@ import { toLua } from '@/export/exportLua'
 import { parseScene } from '@/rig/scene'
 import type { TemplateKey } from '@/rig/templates'
 import { migrateNames, normalizeDoc } from '@/rig/migrate'
+import { validateDoc } from '@/rig/validate'
 import type { RigDoc } from '@/rig/types'
 
 const DEFAULT_SCALE = 1
@@ -462,7 +463,15 @@ export default function App() {
     reader.onload = () => {
       try {
         const data = JSON.parse(String(reader.result)) as RigDoc
-        if (!data || !data.joints || !data.bones || !data.params) throw new Error('不是 rig 文件')
+        const issues = validateDoc(data)
+        if (issues.fatal.length) {
+          alert('导入失败，工程存在无法安全读取的问题：\n\n' + issues.fatal.join('\n'))
+          return
+        }
+        if (issues.warnings.length) {
+          console.warn('[导入工程] ' + issues.warnings.join('\n'))
+          alert('工程已导入，但有以下需要注意的地方：\n\n' + issues.warnings.join('\n'))
+        }
         data.canvas = data.canvas || { width: 820, height: 620 }
         data.ground = data.ground === undefined ? 560 : data.ground
         data.params.dragForce = data.params.dragForce || 320
@@ -537,11 +546,13 @@ export default function App() {
   const importScenes = (files: File[]) => {
     // 没有打开标签时，先建一个空标签（自定义骨架），导入即可看到画布
     if (!activeTabId) newTab('custom')
+    const warnings: string[] = []
     files.forEach(file => {
       const reader = new FileReader()
       reader.onload = () => {
         try {
           const scene = parseScene(JSON.parse(String(reader.result)))
+          for (const w of scene.warnings) warnings.push(`${file.name}：${w}`)
           addPartFromScene(null, file.name.replace(/\.json$/i, ''), scene)
         } catch (err) {
           alert(file.name + ' 导入失败：' + (err as Error).message)
@@ -549,6 +560,10 @@ export default function App() {
       }
       reader.readAsText(file)
     })
+    if (warnings.length) {
+      console.warn('[导入矢量稿] ' + warnings.join('\n'))
+      setTimeout(() => alert('矢量稿已导入，但有以下修正：\n\n' + warnings.join('\n')), 0)
+    }
   }
 
   const itemCls = 'flex h-8 w-full items-center gap-2 rounded-inner px-2.5 text-left text-[13px] text-text hover:bg-surface-hover'

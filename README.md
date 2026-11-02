@@ -175,13 +175,15 @@ src/
 #### 本地校验脚本
 
 ```powershell
-pnpm check          # 下面两个一起跑
+pnpm check          # 下面四个一起跑
+pnpm check:data     # 工程校验 + 矢量稿解析（不需要额外环境）
+pnpm check:opfs     # 存储层：多级目录、删除、列举（用假 OPFS，不需要浏览器）
 pnpm check:export   # 导出侧：图元坐标系、名字转义（需要 lua5.3）
 pnpm parity         # 物理：TS 与 Lua 逐子步比对 8 个场景（需要 lua5.3）
 ```
 
-两个脚本都通过 `LUA53` 环境变量找解释器，默认 `C:\Tools\Lua\lua53.exe`。
-没有 lua5.3 时脚本会提示跳过并以 0 退出，不会卡住 CI。
+后两个通过 `LUA53` 环境变量找解释器，默认 `C:\Tools\Lua\lua53.exe`；
+没有 lua5.3 时它们会提示跳过并以 0 退出，不会卡住 CI。
 
 ## 部署
 

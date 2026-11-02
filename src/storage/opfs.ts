@@ -1,6 +1,9 @@
 /**
  * 持久化：优先走本地小服务（文件落在工具目录的 data/ 下），
  * 服务不可用时退回浏览器 OPFS（隐藏目录）。
+ *
+ * 注意：OPFS 的 getFileHandle() 只接受「文件名」，不接受 `docs/x.json` 这种带斜杠的路径，
+ * 必须自己逐级 getDirectoryHandle()。否则在纯静态部署下所有标签页文档都存不下来。
  */
 const API = '/api/file'
 
@@ -27,10 +30,40 @@ async function serverRead(name: string): Promise<string | null> {
   }
 }
 
+async function serverDelete(name: string): Promise<boolean> {
+  try {
+    const res = await fetch(API + '?name=' + encodeURIComponent(name), { method: 'DELETE' })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+// ---------- OPFS ----------
+
+type OpfsTarget = { dir: FileSystemDirectoryHandle; file: string }
+
+/** 把 `docs/xxx.json` 拆成「目录句柄 + 文件名」，逐级创建或查找 */
+async function resolveOpfs(name: string, create: boolean): Promise<OpfsTarget | null> {
+  if (!navigator.storage?.getDirectory) return null
+  const parts = name.split('/').filter(Boolean)
+  if (!parts.length) return null
+  let dir = await navigator.storage.getDirectory()
+  for (const seg of parts.slice(0, -1)) {
+    try {
+      dir = await dir.getDirectoryHandle(seg, { create })
+    } catch {
+      return null
+    }
+  }
+  return { dir, file: parts[parts.length - 1] }
+}
+
 async function opfsWrite(name: string, text: string): Promise<boolean> {
   try {
-    const dir = await navigator.storage.getDirectory()
-    const handle = await dir.getFileHandle(name, { create: true })
+    const target = await resolveOpfs(name, true)
+    if (!target) return false
+    const handle = await target.dir.getFileHandle(target.file, { create: true })
     const writable = await handle.createWritable()
     await writable.write(text)
     await writable.close()
@@ -42,14 +75,44 @@ async function opfsWrite(name: string, text: string): Promise<boolean> {
 
 async function opfsRead(name: string): Promise<string | null> {
   try {
-    const dir = await navigator.storage.getDirectory()
-    const handle = await dir.getFileHandle(name)
-    const file = await handle.getFile()
-    return await file.text()
+    const target = await resolveOpfs(name, false)
+    if (!target) return null
+    const handle = await target.dir.getFileHandle(target.file)
+    return await (await handle.getFile()).text()
   } catch {
     return null
   }
 }
+
+async function opfsDelete(name: string): Promise<boolean> {
+  try {
+    const target = await resolveOpfs(name, false)
+    if (!target) return false
+    await target.dir.removeEntry(target.file)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function opfsList(dirName: string): Promise<string[]> {
+  try {
+    const parts = dirName.split('/').filter(Boolean)
+    let dir = await navigator.storage.getDirectory()
+    for (const seg of parts) dir = await dir.getDirectoryHandle(seg)
+    const names: string[] = []
+    for await (const [entryName, handle] of (dir as unknown as {
+      entries(): AsyncIterableIterator<[string, FileSystemHandle]>
+    }).entries()) {
+      if (handle.kind === 'file') names.push(entryName)
+    }
+    return names.sort()
+  } catch {
+    return []
+  }
+}
+
+// ---------- 对外接口 ----------
 
 export async function writeText(name: string, text: string): Promise<boolean> {
   if (await serverWrite(name, text)) return true
@@ -78,16 +141,12 @@ export function historyFile(tabId: string) {
   return 'docs/' + tabId + '.history.json'
 }
 
-/** 删除文件（服务端不可用时忽略） */
+/** 删除文件：服务端与 OPFS 两边都清，避免残留孤儿 */
 export async function deleteFile(name: string): Promise<void> {
-  try {
-    await fetch(API + '?name=' + encodeURIComponent(name), { method: 'DELETE' })
-  } catch {
-    /* ignore */
-  }
+  await Promise.all([serverDelete(name), opfsDelete(name)])
 }
 
-/** 页面卸载时同步落盘（sendBeacon 不受卸载中断影响） */
+/** 页面卸载时同步落盘（sendBeacon 不受卸载中断影响；OPFS 在卸载期不可靠，仅走服务端） */
 export function flushBeacon(name: string, text: string) {
   try {
     const blob = new Blob([text], { type: 'text/plain' })
@@ -97,15 +156,19 @@ export function flushBeacon(name: string, text: string) {
   }
 }
 
-/** 列出 data 下某个子目录的文件名；服务不可用时返回空 */
+/** 列出某个子目录的文件名；服务端不可用时退回 OPFS */
 export async function listFiles(dir: string): Promise<string[]> {
   try {
     const res = await fetch('/api/list?dir=' + encodeURIComponent(dir))
-    if (!res.ok) return []
-    return (await res.json()) as string[]
+    if (res.ok) {
+      const names = (await res.json()) as string[]
+      // 服务端可用时以它为准（哪怕是空目录），不要再用 OPFS 的旧数据
+      if (Array.isArray(names)) return names
+    }
   } catch {
-    return []
+    /* 落到 OPFS */
   }
+  return opfsList(dir)
 }
 
 /** 删除 docs 下不属于任何打开标签的文件，返回删除数量 */
@@ -121,4 +184,3 @@ export async function cleanupOrphans(keepTabIds: string[]): Promise<number> {
   }
   return removed
 }
-
