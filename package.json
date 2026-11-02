@@ -1,0 +1,49 @@
+{
+  "name": "miliastra-2d-rig-editor",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "面向原神千星奇域（UGC）的 2D 关节/骨骼编辑与绑定工具，导出可直接使用的千星客户端 Lua",
+  "keywords": [
+    "genshin-impact",
+    "miliastra",
+    "ugc",
+    "2d",
+    "rig",
+    "skeleton",
+    "ik",
+    "verlet",
+    "konva",
+    "lua"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radix-ui/colors": "^3.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "konva": "^10.0.2",
+    "lucide-react": "^0.545.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-konva": "^19.0.10",
+    "tailwind-merge": "^3.3.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9"
+  }
+}

@@ -1,0 +1,175 @@
+@import '@radix-ui/colors/slate.css';
+@import '@radix-ui/colors/slate-dark.css';
+@import '@radix-ui/colors/blue.css';
+@import '@radix-ui/colors/blue-dark.css';
+@import '@radix-ui/colors/red.css';
+@import '@radix-ui/colors/red-dark.css';
+@import '@radix-ui/colors/amber.css';
+@import '@radix-ui/colors/amber-dark.css';
+@import '@radix-ui/colors/violet.css';
+@import '@radix-ui/colors/violet-dark.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Radix 用法约定（1–12 阶）：
+  1 应用底色 · 2 面板 · 3 组件底 · 4 悬停 · 5 选中 · 6 细边 · 7 描边 · 8 强描边
+  9 实心填充 · 10 悬停实心 · 11 次要文字 · 12 主要文字
+  浅色/深色由 <html class="dark"> 切换，Radix 的 *-dark.css 会自动换值。
+*/
+@layer base {
+  :root {
+    --background: var(--slate-1);
+    --canvas-bg: var(--amber-2);
+    --canvas-grid: var(--amber-4);
+    --panel: var(--slate-2);
+    --surface: var(--slate-3);
+    --surface-hover: var(--slate-4);
+    --surface-active: var(--slate-5);
+    --outline: var(--slate-6);
+    --outline-strong: var(--slate-8);
+    --text: var(--slate-12);
+    --text-muted: var(--slate-11);
+    --primary: var(--blue-9);
+    --primary-hover: var(--blue-10);
+    --primary-text: var(--blue-11);
+    --on-primary: #ffffff;
+    --danger: var(--red-9);
+    --danger-text: var(--red-11);
+    --warning: var(--amber-9);
+    --warning-text: var(--amber-11);
+    --radius-card: 16px;
+    --radius-control: 20px;
+    --radius-inner: 12px;
+  }
+
+  .dark {
+    --canvas-bg: var(--slate-3);
+    --canvas-grid: var(--slate-5);
+  }
+
+  * {
+    border-color: var(--outline);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--text);
+    line-height: 1.6;
+    font-family: 'Google Sans', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+}
+
+@layer utilities {
+  /* 0.5px 细线：边框一律用这个 */
+  .hairline {
+    border-width: 0.5px;
+    border-style: solid;
+  }
+  .hairline-t {
+    border-top-width: 0.5px;
+    border-top-style: solid;
+  }
+  .hairline-b {
+    border-bottom-width: 0.5px;
+    border-bottom-style: solid;
+  }
+  .hairline-l {
+    border-left-width: 0.5px;
+    border-left-style: solid;
+  }
+  
+
+
+.elevation-1 {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14), 0 1px 3px rgb(0 0 0 / 0.08);
+}
+
+.elevation-2 {
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.16), 0 4px 10px rgb(0 0 0 / 0.1);
+}
+
+/* 只向下投影：用于顶栏、标签栏这类贴边容器 */
+.elevation-down {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 2px 8px rgb(0 0 0 / 0.06);
+}
+
+/* 滑块：Material 风格的轨道与手柄 */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-active);
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 999px;
+  background: var(--primary);
+  border: none;
+}
+input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-active);
+}
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--primary);
+}
+}
+
+/* 滚动条：与页面同套色阶，细窄圆角 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-active) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--surface-active);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--outline-strong);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}

@@ -1,0 +1,8 @@
+packages:
+  - '.'
+
+# 需要放行 postinstall 的依赖（esbuild 等要下载平台二进制）
+allowBuilds:
+  esbuild: true
+  '@tailwindcss/oxide': true
+  lightningcss: true
