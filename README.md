@@ -170,7 +170,18 @@ src/
 
 - 提交前跑 `pnpm build`（含 `tsc --noEmit`）
 - 改动如果涉及物理或导出，请说明**是否在千星真机验证过**；没验证请明确写"未验证"
-- 改 `src/physics/verlet.ts` 必须同步改 `src/export/exportLua.ts` 里的 `Rig.Update`（两边必须同构）
+- 改 `src/physics/verlet.ts` 必须同步改 `src/export/exportLua.ts` 里的 `Rig.Substep`（两边必须同构），并跑 `pnpm parity` 确认逐子步一致
+
+#### 本地校验脚本
+
+```powershell
+pnpm check          # 下面两个一起跑
+pnpm check:export   # 导出侧：图元坐标系、名字转义（需要 lua5.3）
+pnpm parity         # 物理：TS 与 Lua 逐子步比对 8 个场景（需要 lua5.3）
+```
+
+两个脚本都通过 `LUA53` 环境变量找解释器，默认 `C:\Tools\Lua\lua53.exe`。
+没有 lua5.3 时脚本会提示跳过并以 0 退出，不会卡住 CI。
 
 ## 部署
 

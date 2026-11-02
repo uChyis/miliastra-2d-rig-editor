@@ -21,7 +21,10 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:export": "node scripts/export-check.mjs",
+    "parity": "node scripts/parity.mjs",
+    "check": "node scripts/export-check.mjs && node scripts/parity.mjs"
   },
   "dependencies": {
     "@radix-ui/colors": "^3.0.0",
