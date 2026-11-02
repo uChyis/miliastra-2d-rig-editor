@@ -34,15 +34,9 @@ interface Props {
 
 const HINTS = {
   gravity: '整个模拟世界的重力。0 失重 / 0.25 月球 / 0.5 轻飘 / 1 标准（约 2000 px/s²）',
-  dragForce: '物理预览时鼠标能施加的最大力。100 只能轻推 / 320 正常拖动 / 1000 能甩起来 / 4000 几乎无视重量',
   solver: '每帧约束求解次数。3 会明显拉长 / 8 默认 / 16 很稳但更耗性能',
-  friction: '地面摩擦。0 像冰面 / 0.3 略滑 / 0.6 正常 / 1 几乎不滑',
   restitution: '地面回弹。0 落地即停 / 0.2 轻微弹 / 0.6 有明显弹跳 / 1 几乎不损失能量',
-  width: '骨的视觉粗细，同时决定碰撞体厚度。6 细线 / 12 常规 / 20 粗壮',
-  mass: '质量。0.5 轻，容易被撞飞 / 1 常规 / 5 很沉，推动困难',
-  boneFriction: '这根骨与地面接触时的摩擦。0 打滑 / 0.4 常规 / 0.9 抓地',
-  boneRest: '这根骨被撞击时的回弹。0 不弹 / 0.1 常规 / 0.5 弹手',
-  damping: '运动衰减。0 几乎不衰减，会一直晃 / 0.1 常规 / 0.5 很黏 / 1 立刻停住',
+  width: '骨的视觉粗细。6 细线 / 12 常规 / 20 粗壮',
   limit: '相对父骨的夹角，单位度。0 表示与父骨方向一致；正值向一侧弯，负值向另一侧。上下限相等表示不限制。例：膝盖设 0~150，向后弯就会被挡住',
 }
 
@@ -119,10 +113,11 @@ export function Sidebar({
         {tab === 'world' && (
           <>
             <Slider label="重力" hint={HINTS.gravity} value={doc.params.gravity} min={0} max={1} step={0.01} defaultValue={0} onChange={v => onParam('gravity', v)} disabled={disabled} />
-            <Slider label="拖拽力" hint={HINTS.dragForce} value={doc.params.dragForce} min={20} max={4000} step={10} digits={0} defaultValue={320} onChange={v => onParam('dragForce', v)} disabled={disabled} />
             <Slider label="求解迭代" hint={HINTS.solver} value={doc.params.solverIterations} min={1} max={20} step={1} digits={0} defaultValue={8} onChange={v => onParam('solverIterations', v)} disabled={disabled} />
-            <Slider label="地面摩擦" hint={HINTS.friction} value={doc.params.friction} min={0} max={1} step={0.01} defaultValue={0.6} onChange={v => onParam('friction', v)} disabled={disabled} />
             <Slider label="地面弹性" hint={HINTS.restitution} value={doc.params.restitution} min={0} max={1} step={0.01} defaultValue={0.2} onChange={v => onParam('restitution', v)} disabled={disabled} />
+            <p className="text-[12px] leading-5 text-muted">
+              「地面摩擦」「拖拽力」当前求解器没有使用，已从面板移除（数据字段保留，老工程照常打开）。
+            </p>
           </>
         )}
 
@@ -275,13 +270,8 @@ export function Sidebar({
         ) : tab === 'bone' && (
           bone ? (
             <>
-                        <div className="space-y-2 rounded-inner bg-surface p-2.5">
-              <div className="text-[12px] text-muted">通用属性</div>
-<Slider label="质量" hint={HINTS.mass} value={bone.mass} min={0.1} max={20} step={0.1} digits={1} defaultValue={1} onChange={v => onUpdateAllBones({ mass: v })} disabled={disabled} />
-              <Slider label="摩擦" hint={HINTS.boneFriction} value={bone.friction} min={0} max={1} step={0.01} defaultValue={0.4} onChange={v => onUpdateAllBones({ friction: v })} disabled={disabled} />
-              <Slider label="弹性" hint={HINTS.boneRest} value={bone.restitution} min={0} max={1} step={0.01} defaultValue={0.1} onChange={v => onUpdateAllBones({ restitution: v })} disabled={disabled} />
-              <Slider label="阻尼" hint={HINTS.damping} value={bone.damping} min={0} max={1} step={0.01} defaultValue={0.1} onChange={v => onUpdateAllBones({ damping: v })} disabled={disabled} />
-
+              <div className="rounded-inner bg-surface px-3 py-2 text-[12px] leading-5 text-muted">
+                质量 / 摩擦 / 弹性 / 阻尼 目前没有参与求解，已从面板移除；数据字段保留，已有工程不受影响。
               </div>
 
           <div className="space-y-2 rounded-inner bg-surface p-2.5">

@@ -107,7 +107,8 @@ src/
 ├── rig/
 │   ├── types.ts             数据模型：RigDoc / Joint / Bone / Part / Pose
 │   ├── templates.ts         三套骨架预设
-│   ├── scene.ts             解析矢量稿 JSON
+│   ├── scene.ts             解析矢量稿 JSON（不认识的类型直接报错）
+│   ├── validate.ts          工程导入校验（重复 id / 悬空引用 / 成环 / NaN）
 │   └── migrate.ts           旧工程迁移与默认值
 ├── store/rigStore.ts        Zustand：文档、选区、撤销栈、姿势、绑定
 ├── export/
@@ -132,6 +133,7 @@ src/
 - **遮罩控件未创建**：渐变素材的 `enableMask` 只置了标志位，真机上不会生效
 - **没有时间轴**：只有姿势切换 + 代码插值
 - 部件内的图元只应用自身旋转，部件整体旋转依赖组节点
+- **质量 / 摩擦 / 弹性 / 阻尼 不参与求解**：这几个字段在数据里保留（老工程照常打开），但界面已移除，避免显示成"已生效"的参数。要做受击反馈时再一起接
 
 ## Roadmap
 
@@ -175,9 +177,10 @@ src/
 #### 本地校验脚本
 
 ```powershell
-pnpm check          # 下面四个一起跑
+pnpm check          # 下面五个一起跑
 pnpm check:data     # 工程校验 + 矢量稿解析（不需要额外环境）
 pnpm check:opfs     # 存储层：多级目录、删除、列举（用假 OPFS，不需要浏览器）
+pnpm check:server   # 本地服务：Host/Origin、路径穿越、请求体上限、DELETE 白名单
 pnpm check:export   # 导出侧：图元坐标系、名字转义（需要 lua5.3）
 pnpm parity         # 物理：TS 与 Lua 逐子步比对 8 个场景（需要 lua5.3）
 ```

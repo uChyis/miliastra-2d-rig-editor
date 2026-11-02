@@ -147,8 +147,15 @@ export function toLua(doc: RigDoc): string {
 
   const p = doc.params
 
+  // 没有图元数据的部件在运行时只会建一个空组节点，不会显示任何东西；
+  // 编辑器里为了能选中会画一个占位方块，容易让人以为导出也对——这里显式提示。
+  const emptyParts = doc.parts.filter(pt => !pt.elements || pt.elements.length === 0).map(pt => pt.name || pt.id)
+
   const warnHeader =
-    badNumbers > 0 ? `-- ⚠ 已把 ${badNumbers} 个非法数值（NaN/Infinity）按 0 导出，请检查工程数据\n` : ''
+    (badNumbers > 0 ? `-- ⚠ 已把 ${badNumbers} 个非法数值（NaN/Infinity）按 0 导出，请检查工程数据\n` : '') +
+    (emptyParts.length
+      ? `-- ⚠ ${emptyParts.length} 个部件没有图元数据，运行时不会显示：${oneLine(emptyParts.slice(0, 8).join('、'))}\n`
+      : '')
 
   const raw = `${warnHeader}-- 由 Miliastra 2D Rig Editor 导出
 -- 骨架：${oneLine(doc.name)}
