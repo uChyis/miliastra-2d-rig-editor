@@ -37,8 +37,9 @@ const runDriver = file =>
     .trim()
     .split(/\r?\n/)
     .map(line => {
-      const [kind, partId, x, y, rot] = line.split(' ')
-      return { kind, partId, x: Number(x), y: Number(y), rot: Number(rot) }
+      const [kind, partId, ...rest] = line.split(' ')
+      const nums = rest.map(Number)
+      return { kind, partId, x: nums[0], y: nums[1], rot: nums[2] ?? 0, nums }
     })
 
 let failed = 0
@@ -97,6 +98,38 @@ check(
   '图元局部坐标以部件画布中心为原点',
   el ? `实际 (${el.x}, ${el.y}) 期望 (${expectedX}, ${expectedY})` : '没有生成图元控件',
 )
+
+// ---------- 2) 颜色解析：3 位、6 位、8 位 ----------
+
+const colorDoc = {
+  ...geoDoc,
+  name: 'colors',
+  parts: [
+    {
+      ...geoDoc.parts[0],
+      id: 'pc',
+      elements: [
+        { id: 'c3', type: 'rectangle', x: 10, y: 10, width: 4, height: 4, rotation: 0, color: '#f00', opacity: 1, zIndex: 0 },
+        { id: 'c6', type: 'rectangle', x: 20, y: 10, width: 4, height: 4, rotation: 0, color: '#00ff00', opacity: 1, zIndex: 1 },
+        { id: 'c8', type: 'rectangle', x: 30, y: 10, width: 4, height: 4, rotation: 0, color: '#0000ff80', opacity: 0.5, zIndex: 2 },
+      ],
+    },
+  ],
+}
+const colorRows = runDriver(writeRig(colorDoc, 'colors')).filter(r => r.kind === 'COLOR')
+check(colorRows.length === 3, '三个图元都写入了颜色', `实际 ${colorRows.length} 个`)
+const asRgba = row => row.nums.slice(0, 4)
+const expectRgba = (row, want, label) => {
+  const got = row ? asRgba(row) : []
+  check(
+    got.length === 4 && got.every((v, i) => v === want[i]),
+    label,
+    `实际 [${got.join(',')}] 期望 [${want.join(',')}]`,
+  )
+}
+expectRgba(colorRows[0], [255, 0, 0, 255], '#RGB 能解析成 r,g,b,a')
+expectRgba(colorRows[1], [0, 255, 0, 255], '#RRGGBB 能解析成 r,g,b,a')
+expectRgba(colorRows[2], [0, 0, 255, 64], '#RRGGBBAA 的 alpha 与元素不透明度相乘')
 
 const grp = rows.find(r => r.kind === 'GROUP' && r.partId === 'p1')
 check(!!grp, '部件组节点已创建', grp ? `组位置 (${grp.x}, ${grp.y})` : '')

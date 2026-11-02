@@ -221,6 +221,21 @@ local function angleOf(dy, dx)
   return math.atan(dy, dx)
 end
 
+--- 颜色解析：#RGB / #RRGGBB / #RRGGBBAA → r, g, b, a（alpha 再乘元素的 opacity）
+local function parseColor(hex, alpha)
+  local s = tostring(hex or ""):gsub("#", "")
+  if #s == 3 then
+    s = s:sub(1, 1):rep(2) .. s:sub(2, 2):rep(2) .. s:sub(3, 3):rep(2)
+  end
+  local r = tonumber(s:sub(1, 2), 16) or 255
+  local g = tonumber(s:sub(3, 4), 16) or 255
+  local b = tonumber(s:sub(5, 6), 16) or 255
+  local ca = #s >= 8 and (tonumber(s:sub(7, 8), 16) or 255) or 255
+  local a = math.floor(ca * (alpha or 1))
+  if a < 0 then a = 0 elseif a > 255 then a = 255 end
+  return r, g, b, a
+end
+
 -- 骨原长同样按初始姿态快照；否则会取到已经积分过的长度
 for _, b in ipairs(Rig.bones) do
   local sa, sb = Rig.state[b.a], Rig.state[b.b]
@@ -701,12 +716,7 @@ function Rig.CreateCharacter(parent, prefab)
             -- 所以这里必须减去部件自身画布的一半，不能减世界坐标（part.cx）
             Rig.ResetControl(c, el.x - (part.sw or 0) / 2, el.y - (part.sh or 0) / 2, el.rot, 1, 1)
             if c.SetSizeDelta then c:SetSizeDelta(el.w, el.h) end
-            c.imageColor = Color.FromRGBA(
-              tonumber(el.color:sub(2, 3), 16) or 255,
-              tonumber(el.color:sub(4, 5), 16) or 255,
-              tonumber(el.color:sub(6, 7), 16) or 255,
-              math.floor((el.alpha or 1) * 255)
-            )
+            c.imageColor = Color.FromRGBA(parseColor(el.color, el.alpha))
             c.enableMask = el.mask ~= nil
             if el.mask then
               c.reverseMaskArea = el.mask.reverse == true

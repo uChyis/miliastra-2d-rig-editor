@@ -232,15 +232,28 @@ export default function App() {
     }
   }, [])
 
+  // 写盘失败必须让用户知道，否则刷新一下就没了
+  const saveWarnedRef = useRef(false)
+  const persist = async (name: string, text: string) => {
+    const ok = await writeText(name, text)
+    if (!ok && !saveWarnedRef.current) {
+      saveWarnedRef.current = true
+      alert(
+        '自动保存失败：本地服务和浏览器存储都写不进去。\n\n请立刻用「导出 → 工程 JSON」保存一份，否则刷新或关闭页面会丢失当前工程。',
+      )
+    }
+    return ok
+  }
+
   // 立即把某个标签的骨架写入文件
-  const flushDoc = (tabId: string, value: RigDoc) => writeText(docFile(tabId), JSON.stringify(value))
+  const flushDoc = (tabId: string, value: RigDoc) => persist(docFile(tabId), JSON.stringify(value))
 
   // 当前标签的骨架写回各自的文件（受「自动保存」开关控制）
   useEffect(() => {
     if (!workspaceLoaded || !activeTabId) return
     if (!fileAutosave) return
     const t = setTimeout(() => {
-      void writeText(docFile(activeTabId), JSON.stringify(docRef.current))
+      void persist(docFile(activeTabId), JSON.stringify(docRef.current))
     }, 600)
     return () => clearTimeout(t)
   }, [doc, activeTabId, workspaceLoaded, fileAutosave])
@@ -260,7 +273,7 @@ export default function App() {
   useEffect(() => {
     if (!workspaceLoaded || !activeTabId || !fileAutosave) return
     const t = setTimeout(() => {
-      void writeText(historyFile(activeTabId), JSON.stringify({ past, future }))
+      void persist(historyFile(activeTabId), JSON.stringify({ past, future }))
     }, 1200)
     return () => clearTimeout(t)
   }, [past.length, future.length, activeTabId, workspaceLoaded, fileAutosave]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -268,7 +281,7 @@ export default function App() {
   // 标签列表与激活项
   useEffect(() => {
     if (!workspaceLoaded) return
-    void writeText(WORKSPACE_FILE, JSON.stringify({ tabs, activeId: activeTabId }, null, 2))
+    void persist(WORKSPACE_FILE, JSON.stringify({ tabs, activeId: activeTabId }, null, 2))
   }, [tabs, activeTabId, workspaceLoaded])
 
   useEffect(() => {
@@ -531,13 +544,17 @@ export default function App() {
   }
 
   const handleApplyPreset = (key: TemplateKey) => {
+    // 只给「这次新加进来」的骨架套用统一尺寸，别覆盖已有工程里调好的骨粗 / 关节大小
+    const before = useRig.getState().doc
+    const oldJoints = new Set(before.joints.map(j => j.id))
+    const oldBones = new Set(before.bones.map(b => b.id))
     applySkeletonPreset(key)
     const state = useRig.getState()
     useRig.setState({
       doc: {
         ...state.doc,
-        joints: state.doc.joints.map(j => ({ ...j, radius: jointRadius })),
-        bones: state.doc.bones.map(b => ({ ...b, width: boneWidth })),
+        joints: state.doc.joints.map(j => (oldJoints.has(j.id) ? j : { ...j, radius: jointRadius })),
+        bones: state.doc.bones.map(b => (oldBones.has(b.id) ? b : { ...b, width: boneWidth })),
       },
     })
   }
@@ -620,7 +637,14 @@ export default function App() {
           <ExportMenu
             disabled={!activeTabId}
             onExportJson={() => downloadJson((doc.name || 'rig') + '.rig.json', toExport(doc))}
-            onExportLua={() => downloadText((doc.name || 'rig') + '.lua', toLua(doc))}
+            onExportLua={() => {
+          // 导出失败要让用户看到原因，而不是点一下什么都没发生
+          try {
+            downloadText((doc.name || 'rig') + '.lua', toLua(doc))
+          } catch (err) {
+            alert('导出 Lua 失败：' + (err as Error).message)
+          }
+        }}
           />
 
           <div className="pointer-events-none absolute left-1/2 max-w-[36vw] -translate-x-1/2 truncate text-[14px] font-medium text-text">

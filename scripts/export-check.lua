@@ -33,5 +33,9 @@ for partId, g in pairs(Rig.groups) do
   print(string.format('GROUP %s %.6f %.6f %.6f', partId, g.px, g.py, g.rot or 0))
   for _, child in ipairs(g.children) do
     print(string.format('ELEMENT %s %.6f %.6f %.6f', partId, child.px, child.py, child.rot or 0))
+    local col = child.imageColor
+    if type(col) == 'table' then
+      print(string.format('COLOR %s %d %d %d %d', partId, col[1] or 0, col[2] or 0, col[3] or 0, col[4] or 0))
+    end
   end
 end
