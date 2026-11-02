@@ -1,5 +1,8 @@
 # Miliastra 2D Rig Editor
 
+[![CI](https://github.com/uChyis/miliastra-2d-rig-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/uChyis/miliastra-2d-rig-editor/actions/workflows/ci.yml)
+[![Deploy](https://github.com/uChyis/miliastra-2d-rig-editor/actions/workflows/pages.yml/badge.svg)](https://github.com/uChyis/miliastra-2d-rig-editor/actions/workflows/pages.yml)
+
 面向原神「千星奇域」（UGC）的 **2D 关节 / 骨骼编辑与绑定工具**：在浏览器里搭骨架、把矢量稿绑到骨上、用物理预览调姿势，导出**千星客户端可直接使用的 Lua 模块**。
 
 纯前端（React + Konva + Zustand），无需账号、无需联网，一个静态站点就能跑。
@@ -35,7 +38,7 @@ pnpm preview    # 预览构建产物
 
 `dist/` 可直接放 GitHub Pages / Cloudflare Pages 等静态托管（`base: './'`，子目录也能用）。
 
-**在线试用**：<https://uChyis.github.io/miliastra-2d-rig-editor/>（启用 Pages 后生效，见 [部署](#部署)）
+**在线试用**：<https://uChyis.github.io/miliastra-2d-rig-editor/>
 
 **没有后端也能用**：`server.mjs` 只负责把工程存成文件；没有 `/api` 时自动退到浏览器 OPFS。
 
