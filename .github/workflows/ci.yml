@@ -6,16 +6,36 @@ on:
   pull_request:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: 安装 Lua 5.3（物理/导出对照需要）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.3
+          lua5.3 -v
+
       - name: 安装 pnpm
         run: npm i -g pnpm@12
+
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
-      - name: 类型检查与构建
+
+      - name: 类型检查
+        run: pnpm typecheck
+
+      # 核心检查：数据 / OPFS / 服务 / 导出 / 物理一致性
+      # REQUIRE_LUA=1 保证缺 Lua 时直接失败，而不是"跳过并成功"
+      - name: 自动化检查
+        run: pnpm check
+        env:
+          LUA53: lua5.3
+          REQUIRE_LUA: '1'
+
+      - name: 生产构建
         run: pnpm build

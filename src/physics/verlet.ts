@@ -91,7 +91,12 @@ export class VerletEngine {
   }
 
   step(dt: number): RuntimeFrame {
-    this.acc = Math.min(this.acc + dt, 0.1)
+    // 与导出 Lua 完全一致的异常 dt 规则：NaN/负数按 0，Infinity 与超大值按 0.1 封顶。
+    // 不做保护的话 NaN 会污染整个质点数组，之后再也恢复不回来。
+    let h = typeof dt === 'number' ? dt : 0
+    if (Number.isNaN(h) || h < 0) h = 0
+    if (h > 0.1) h = 0.1
+    this.acc = Math.min(this.acc + h, 0.1)
     let guard = 0
     while (this.acc >= FIXED_DT && guard < 8) {
       this.substep(FIXED_DT)

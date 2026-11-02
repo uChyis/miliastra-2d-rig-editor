@@ -18,7 +18,8 @@ import { downloadJson, downloadText, toExport } from '@/export/exportRig'
 import { toLua } from '@/export/exportLua'
 import { parseScene } from '@/rig/scene'
 import type { TemplateKey } from '@/rig/templates'
-import { migrateNames, normalizeDoc } from '@/rig/migrate'
+import { prepareImportedDoc } from '@/rig/migrate'
+import { restoreTabs } from '@/rig/restore'
 import { validateDoc } from '@/rig/validate'
 import type { RigDoc } from '@/rig/types'
 
@@ -55,6 +56,8 @@ export default function App() {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; wx: number; wy: number } | null>(null)
   const [ctxSub, setCtxSub] = useState<'skel' | 'import' | null>(null)
   const sceneRef = useRef<HTMLInputElement | null>(null)
+  /** 启动时恢复失败的标签：文件要保留，不能被孤儿清理删掉 */
+  const protectedTabIdsRef = useRef<string[]>([])
   const [showJointNames, setShowJointNames] = useState(false)
   const [showBoneNames, setShowBoneNames] = useState(false)
   const [showPartNames, setShowPartNames] = useState(false)
@@ -187,6 +190,7 @@ export default function App() {
   }, [clipboard])
 
   // 启动恢复：工作区标签 + 各标签的骨架与撤回栈
+  // 每个标签独立 try/catch：单个损坏的工程不能让整个工作区都恢复失败
   useEffect(() => {
     let alive = true
     void (async () => {
@@ -195,35 +199,34 @@ export default function App() {
         setWorkspaceLoaded(true)
         return
       }
+
+      let ws: { tabs?: Array<{ id: string; name: string }>; activeId?: string | null }
       try {
-        const ws = JSON.parse(text) as { tabs: Array<{ id: string; name: string }>; activeId: string | null }
-        const docs: Record<string, RigDoc> = {}
-        const histories: Record<string, { past: RigDoc[]; future: RigDoc[] }> = {}
-        const kept: Array<{ id: string; name: string }> = []
-
-        for (const tab of ws.tabs ?? []) {
-          const docText = await readText(docFile(tab.id))
-          if (!docText) continue
-          const parsed = normalizeDoc(migrateNames(JSON.parse(docText) as RigDoc))
-          parsed.joints = parsed.joints.map(j => ({ ...j, radius: sizeRef.current.jointRadius }))
-          parsed.bones = parsed.bones.map(b => ({ ...b, width: sizeRef.current.boneWidth }))
-          docs[tab.id] = parsed
-          kept.push(tab)
-
-          const hisText = await readText(historyFile(tab.id))
-          if (hisText) {
-            try {
-              const his = JSON.parse(hisText) as { past: RigDoc[]; future: RigDoc[] }
-              histories[tab.id] = { past: his.past ?? [], future: his.future ?? [] }
-            } catch {
-              /* ignore */
-            }
-          }
-        }
-
-        if (alive && kept.length) restoreWorkspace(kept, ws.activeId, docs, histories)
+        ws = JSON.parse(text) as typeof ws
       } catch {
-        /* 工作区损坏则从空开始 */
+        alert('工作区索引损坏，无法读取标签列表。\n\n已从空工作区开始；原文件不会被覆盖，可以在 data 目录里手工找回。')
+        setWorkspaceLoaded(true)
+        return
+      }
+
+      const { docs, histories, kept, failed } = await restoreTabs(
+        ws.tabs ?? [],
+        readText,
+        docFile,
+        historyFile,
+        { jointRadius: sizeRef.current.jointRadius, boneWidth: sizeRef.current.boneWidth },
+      )
+
+      // 打不开的标签，其工程文件要保护起来：孤儿清理时不能删
+      protectedTabIdsRef.current = failed.map(f => f.id)
+
+      if (alive && kept.length) restoreWorkspace(kept, ws.activeId ?? null, docs, histories)
+      if (alive && failed.length) {
+        alert(
+          '以下工程无法恢复（原始文件已保留，未做任何修改）：\n\n' +
+            failed.map(f => `· ${f.name}：${f.reason}`).join('\n') +
+            '\n\n可以先用「导入 → 工程 JSON」打开这些文件检查，或到 data/docs 目录手工备份。',
+        )
       }
       if (alive) setWorkspaceLoaded(true)
     })()
@@ -485,11 +488,12 @@ export default function App() {
           console.warn('[导入工程] ' + issues.warnings.join('\n'))
           alert('工程已导入，但有以下需要注意的地方：\n\n' + issues.warnings.join('\n'))
         }
-        data.canvas = data.canvas || { width: 820, height: 620 }
-        data.ground = data.ground === undefined ? 560 : data.ground
-        data.params.dragForce = data.params.dragForce || 320
-        data.params.solverIterations = data.params.solverIterations || 8
-        replaceDoc(normalizeDoc(migrateNames(data)))
+        // 先规范化（这一步才会补齐 params / canvas / ground），再访问可选字段。
+        // 旧工程可能完全没有 params，直接在规范化之前写 data.params.x 会抛 TypeError。
+        const normalized = prepareImportedDoc(data)
+        normalized.canvas = normalized.canvas ?? { width: 820, height: 620 }
+        normalized.ground = normalized.ground ?? 560
+        replaceDoc(normalized)
         centerOn(useRig.getState().doc)
       } catch (err) {
         alert('导入失败：' + (err as Error).message)
@@ -991,7 +995,8 @@ export default function App() {
           setClipboardText('已清空复制历史')
         }}
         onCleanup={async () => {
-          const keep = useRig.getState().tabs.map(t => t.id)
+          // 打不开的工程也要列进 keep，否则会被当成孤儿删掉
+          const keep = [...new Set([...useRig.getState().tabs.map(t => t.id), ...protectedTabIdsRef.current])]
           const removed = await cleanupOrphans(keep)
           setCleanupText(removed > 0 ? '已删除 ' + removed + ' 个残留文件' : '没有需要清理的文件')
         }}

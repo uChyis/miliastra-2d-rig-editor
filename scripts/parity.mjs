@@ -144,6 +144,15 @@ const scenarios = [
     }),
     dts: [0.5, 0.5, 0.5],
   },
+  {
+    name: '异常 dt：0 / 负数 / NaN / Infinity / 极大',
+    doc: baseDoc({
+      params: { ...baseDoc().params, gravity: 1 },
+      joints: [J('a', 100, 60), J('b', 100, 140)],
+      bones: [B('ab', 'a', 'b')],
+    }),
+    dts: [0, 0, 1 / 60, -1, -0.5, Number.NaN, 1 / 60, Infinity, -Infinity, 1e9, 1 / 60],
+  },
 ]
 
 // ---------- 两端执行 ----------
@@ -158,7 +167,16 @@ function runLua(doc, dts) {
   try {
     const rigPath = path.join(dir, 'rig.lua')
     writeFileSync(rigPath, toLua(doc), 'utf8')
-    const out = execFileSync(LUA, [DRIVER, rigPath, dts.map(d => d.toFixed(10)).join(',')], {
+    // 编码 dt：特殊值用标记传给 Lua，保持两端拿到的是同一个数
+    const encoded = dts
+      .map(d => {
+        if (Number.isNaN(d)) return 'nan'
+        if (d === Infinity) return 'inf'
+        if (d === -Infinity) return '-inf'
+        return Number(d).toFixed(10)
+      })
+      .join(',')
+    const out = execFileSync(LUA, [DRIVER, rigPath, encoded], {
       encoding: 'utf8',
     })
     const lines = out.trim().split(/\r?\n/)
@@ -203,6 +221,13 @@ try {
 }
 
 if (!luaOk) {
+  // CI 里不允许静默跳过：没有 Lua 就等于这项没测，必须让流水线红
+  const strict = process.env.REQUIRE_LUA === '1' || !!process.env.CI
+  if (strict) {
+    console.error(`[失败] 找不到 lua5.3：${LUA}`)
+    console.error('CI / REQUIRE_LUA=1 下不允许跳过。请安装 lua5.3 或设置 LUA53 指向它。')
+    process.exit(1)
+  }
   console.log(`[跳过 Lua 侧] 找不到解释器：${LUA}`)
   console.log('设置环境变量 LUA53 指向你的 lua5.3 可执行文件后重跑。')
   console.log('（TS 侧仍会跑一遍，确保场景构造没报错）')

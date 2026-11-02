@@ -185,8 +185,10 @@ pnpm check:export   # 导出侧：图元坐标系、名字转义（需要 lua5.3
 pnpm parity         # 物理：TS 与 Lua 逐子步比对 8 个场景（需要 lua5.3）
 ```
 
-后两个通过 `LUA53` 环境变量找解释器，默认 `C:\Tools\Lua\lua53.exe`；
-没有 lua5.3 时它们会提示跳过并以 0 退出，不会卡住 CI。
+后两个通过 `LUA53` 环境变量找解释器，默认 `C:\Tools\Lua\lua53.exe`。
+
+`check:export` 与 `parity` 在没有 Lua 时会**明确说明跳过原因并以 0 退出**（本地没有依赖时不至于卡住）；
+CI 里则设置 `REQUIRE_LUA=1`，缺 Lua 直接失败——不允许"跳过并成功"。
 
 ## 部署
 

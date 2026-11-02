@@ -22,6 +22,13 @@ const DRIVER = path.join(here, 'export-check.lua')
 try {
   execFileSync(LUA, ['-v'], { stdio: 'ignore' })
 } catch {
+  // CI 里不允许静默跳过：没有 Lua 就等于导出侧没测
+  const strict = process.env.REQUIRE_LUA === '1' || !!process.env.CI
+  if (strict) {
+    console.error(`[失败] 找不到 lua5.3：${LUA}`)
+    console.error('CI / REQUIRE_LUA=1 下不允许跳过。请安装 lua5.3 或设置 LUA53 指向它。')
+    process.exit(1)
+  }
   console.log(`[跳过] 找不到 lua53：${LUA}（设置 LUA53 后重跑）`)
   process.exit(0)
 }

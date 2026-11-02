@@ -1,10 +1,9 @@
 import { create } from 'zustand'
 import type { Bone, EditorMode, Part, RigDoc, SceneElement } from '@/rig/types'
 import { buildTemplate, type TemplateKey } from '@/rig/templates'
+import { beginGesture as beginTabGesture, endGesture as endTabGesture, forgetTab, gateOf, shouldSnapshot } from '@/store/historyGate'
 
 const DEFAULT_MAX_HISTORY = 50
-let inGesture = false
-let lastSnapAt = 0
 let seq = 0
 
 interface RigState {
@@ -81,11 +80,9 @@ interface RigState {
 
 export const useRig = create<RigState>((set, get) => {
   const snapshot = () => {
-    if (inGesture) return
-    const now = Date.now()
-    if (now - lastSnapAt < 400) return
-    lastSnapAt = now
     const state = get()
+    // 手势与节流状态按标签页隔离，切 tab 不能串用
+    if (!shouldSnapshot(state.activeTabId, Date.now())) return
     set({ past: [...state.past, state.doc].slice(-state.maxHistory), future: [] })
   }
 
@@ -160,6 +157,8 @@ export const useRig = create<RigState>((set, get) => {
 
     closeTab: id => {
       const state = get()
+      // 关掉标签就丢掉它的手势/节流状态，避免 id 复用时继承旧状态
+      forgetTab(id)
       const docs = state.activeTabId === id ? state.docs : { ...state.docs, [state.activeTabId ?? '']: state.doc }
       const tabs = state.tabs.filter(t => t.id !== id)
       const restDocs = { ...docs }
@@ -777,14 +776,15 @@ export const useRig = create<RigState>((set, get) => {
     },
 
     beginGesture: () => {
-      if (inGesture) return
       const state = get()
+      // 已经在手势里就不重复压栈；手势状态按标签页独立
+      if (gateOf(state.activeTabId).inGesture) return
+      beginTabGesture(state.activeTabId)
       set({ past: [...state.past, state.doc].slice(-state.maxHistory), future: [] })
-      inGesture = true
     },
 
     endGesture: () => {
-      inGesture = false
+      endTabGesture(get().activeTabId)
     },
 
     undo: () => {

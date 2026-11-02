@@ -7,11 +7,24 @@ import assert from 'node:assert/strict'
 
 import { validateDoc } from '../src/rig/validate.ts'
 import { parseScene } from '../src/rig/scene.ts'
+import { prepareImportedDoc } from '../src/rig/migrate.ts'
+import { restoreTabs } from '../src/rig/restore.ts'
+import { beginGesture, endGesture, forgetTab, gateOf, resetGates, shouldSnapshot } from '../src/store/historyGate.ts'
 
 let failed = 0
 const check = (label, fn) => {
   try {
     fn()
+    console.log('PASS  ' + label)
+  } catch (e) {
+    failed += 1
+    console.log('FAIL  ' + label + ' — ' + (e?.message ?? e))
+  }
+}
+
+const checkAsync = async (label, fn) => {
+  try {
+    await fn()
     console.log('PASS  ' + label)
   } catch (e) {
     failed += 1
@@ -155,8 +168,141 @@ check('过小尺寸被抬到 0.5 并给提示', () => {
   assert.ok(r.warnings.some(m => m.includes('0.5px')))
 })
 
+// ---- prepareImportedDoc：旧工程兼容（缺 params）----
+
+check('缺整个 params 时补默认值且不抛错', () => {
+  const raw = doc()
+  delete raw.params
+  const out = prepareImportedDoc(raw)
+  assert.deepEqual(out.params, {
+    gravity: 0,
+    damping: 0.99,
+    friction: 0.6,
+    restitution: 0.2,
+    dragForce: 320,
+    solverIterations: 8,
+  })
+})
+
+check('只缺部分 params 字段时保留已有值', () => {
+  const raw = doc({ params: { gravity: 0.5, damping: 0.9 } })
+  const out = prepareImportedDoc(raw)
+  assert.equal(out.params.gravity, 0.5)
+  assert.equal(out.params.damping, 0.9)
+  assert.equal(out.params.dragForce, 320)
+  assert.equal(out.params.solverIterations, 8)
+})
+
+check('缺 canvas / ground / parts / poses 时补默认值', () => {
+  const raw = doc()
+  delete raw.canvas
+  delete raw.ground
+  delete raw.parts
+  delete raw.poses
+  const out = prepareImportedDoc(raw)
+  assert.deepEqual(out.canvas, { width: 820, height: 620 })
+  assert.equal(out.ground, 560)
+  assert.deepEqual(out.parts, [])
+  assert.deepEqual(out.poses, [])
+})
+
+check('不是工程对象时给出明确错误', () => {
+  assert.throws(() => prepareImportedDoc({ version: 1 }), /joints/)
+})
+
+// ---- restoreTabs：单个损坏不影响其它标签 ----
+
+await checkAsync('三个标签中一个损坏，其余正常恢复', async () => {
+  const files = {
+    'docs/a.json': JSON.stringify(doc()),
+    'docs/b.json': '{ this is not json',
+    'docs/c.json': JSON.stringify((() => {
+      const d = doc()
+      delete d.params
+      return d
+    })()),
+  }
+  const read = async name => files[name] ?? null
+  const res = await restoreTabs(
+    [
+      { id: 'a', name: 'A' },
+      { id: 'b', name: 'B' },
+      { id: 'c', name: 'C' },
+    ],
+    read,
+    id => `docs/${id}.json`,
+    id => `docs/${id}.history.json`,
+    { jointRadius: 5, boneWidth: 6 },
+  )
+  assert.deepEqual(res.kept.map(t => t.id), ['a', 'c'])
+  assert.deepEqual(res.failed.map(f => f.id), ['b'])
+  assert.ok(res.failed[0].reason.length > 0, '损坏原因应非空')
+  assert.ok(res.docs.a && res.docs.c, '正常工程应恢复')
+  assert.equal(res.docs.b, undefined, '损坏工程不应进入 docs')
+  // 缺 params 的旧工程也要能恢复
+  assert.equal(res.docs.c.params.solverIterations, 8)
+})
+
+await checkAsync('文件缺失的标签单独标记为失败', async () => {
+  const read = async () => null
+  const res = await restoreTabs([{ id: 'x', name: 'X' }], read, id => id + '.json', id => id + '.his', {
+    jointRadius: 5,
+    boneWidth: 6,
+  })
+  assert.deepEqual(res.kept, [])
+  assert.equal(res.failed.length, 1)
+  assert.match(res.failed[0].reason, /不存在/)
+})
+
+await checkAsync('历史文件损坏只丢历史，工程仍恢复', async () => {
+  const files = {
+    'docs/a.json': JSON.stringify(doc()),
+    'docs/a.his.json': 'broken',
+  }
+  const read = async name => files[name] ?? null
+  const res = await restoreTabs([{ id: 'a', name: 'A' }], read, id => `docs/${id}.json`, id => `docs/${id}.his.json`, {
+    jointRadius: 5,
+    boneWidth: 6,
+  })
+  assert.deepEqual(res.kept.map(t => t.id), ['a'])
+  assert.equal(res.histories.a, undefined)
+})
+
+// ---- historyGate：撤销状态按标签隔离 ----
+
+await checkAsync('A 标签拖拽中不影响 B 的撤销触发', async () => {
+  resetGates()
+  beginGesture('tabA')
+  assert.equal(shouldSnapshot('tabA', 1000), false, 'A 在手势中不该压快照')
+  assert.equal(shouldSnapshot('tabB', 1000), true, 'B 不受 A 的手势影响')
+})
+
+await checkAsync('节流窗口按标签分别计时', async () => {
+  resetGates()
+  assert.equal(shouldSnapshot('A', 1000), true)
+  assert.equal(shouldSnapshot('A', 1200), false, '400ms 内应被节流')
+  assert.equal(shouldSnapshot('B', 1200), true, 'B 有自己的计时')
+  assert.equal(shouldSnapshot('A', 1450), true, '超过窗口后恢复')
+})
+
+await checkAsync('结束手势后立刻允许压快照', async () => {
+  resetGates()
+  beginGesture('A')
+  assert.equal(shouldSnapshot('A', 5000), false)
+  endGesture('A')
+  assert.equal(shouldSnapshot('A', 5000), true)
+})
+
+await checkAsync('关闭标签后状态被清理', async () => {
+  resetGates()
+  beginGesture('X')
+  forgetTab('X')
+  assert.equal(gateOf('X').inGesture, false)
+})
+
 if (failed) {
   console.log(`\n${failed} 项失败`)
   process.exit(1)
 }
 console.log('\n全部通过')
+

@@ -20,8 +20,16 @@ local ids = {}
 for _, j in ipairs(Rig.joints) do ids[#ids + 1] = j.id end
 print('IDS ' .. table.concat(ids, ','))
 
+-- dt 允许用 nan / inf / -inf 三个特殊标记，方便测异常输入
+local function parseDt(token)
+  if token == 'nan' then return 0 / 0 end
+  if token == 'inf' then return math.huge end
+  if token == '-inf' then return -math.huge end
+  return tonumber(token)
+end
+
 for token in string.gmatch(dtList, '[^,]+') do
-  Rig.Update(tonumber(token))
+  Rig.Update(parseDt(token))
   local cells = {}
   for _, id in ipairs(ids) do
     local s = Rig.state[id]

@@ -115,3 +115,20 @@ export function migrateNames(doc: RigDoc): RigDoc {
   return { ...doc, joints, bones, parts: doc.parts ?? [], poses: doc.poses ?? [] }
 }
 
+/**
+ * 导入工程的标准流程：**先规范化，再补默认值，最后才允许访问可选字段**。
+ *
+ * 旧工程常常整个 `params` 都缺失；如果调用方在规范化之前写 `doc.params.xxx`，
+ * 会直接抛 TypeError（这正是旧版本导入旧存档失败的原因）。
+ */
+export function prepareImportedDoc(raw: RigDoc): RigDoc {
+  if (!raw || typeof raw !== 'object') throw new Error('文件内容不是一个 JSON 对象')
+  if (!Array.isArray(raw.joints) || !Array.isArray(raw.bones)) {
+    throw new Error('工程缺少 joints / bones 数组')
+  }
+  const normalized = normalizeDoc(migrateNames(raw))
+  normalized.canvas = normalized.canvas ?? { width: 820, height: 620 }
+  normalized.ground = normalized.ground ?? 560
+  return normalized
+}
+
